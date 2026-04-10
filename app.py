@@ -10,70 +10,61 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
-# 1. PAGE CONFIG
+# --- CONFIG ---
 st.set_page_config(page_title="Kärna Service Logic", layout="wide")
 
-# 2. DATA ENGINE
-@st.cache_data
-def generate_granular_data():
+# --- BACKGROUND SYNC SIMULATION (The 24h Cycle) ---
+@st.cache_data(ttl=86400) # This forces a 24-hour refresh cycle
+def sync_fortnox_data():
     dates = pd.date_range(end=datetime.today(), periods=90, freq='D')
+    # Logic: Input Waste (Ingredients) vs Output Waste (Sales/Plate)
     data = {
         'date': dates,
-        'supplier_invoice_sek': np.random.uniform(10000, 15000, size=90),
-        'ingredient_waste_kg': np.random.uniform(5, 15, size=90),
-        'sales_plate_waste_kg': np.random.uniform(2, 8, size=90),
-        'contract_hours': [160] * 90,
-        'actual_hours_clocked': np.random.uniform(160, 185, size=90),
-        'max_individual_overtime': np.random.uniform(4, 15, size=90)
+        'supplier_spend': np.random.uniform(10000, 15000, size=90),
+        'ingredient_waste': np.random.uniform(5, 15, size=90), # INPUT
+        'plate_waste': np.random.uniform(2, 8, size=90),      # OUTPUT
+        'contract_hrs': [160] * 90,
+        'actual_hrs': np.random.uniform(160, 185, size=90),
+        'burnout_max': np.random.uniform(4, 15, size=90)
     }
     return pd.DataFrame(data)
 
-df = generate_granular_data()
+df = sync_fortnox_data()
 
-# 3. SIDEBAR
-st.sidebar.title("Kärna Service Logic")
-view_mode = st.sidebar.radio("Analys", ["CSRD Rapportering", "Operativ Drift"])
+# --- HEADER & COMPLIANCE ---
+st.title(" Kärna Service Logic")
+st.info(" Last sync with Fortnox: Today at 02:00 AM (24h Cycle)")
 
-# 4. FORCED VISIBILITY SECTION (TOP OF PAGE)
-st.title("📊 Kärna Service Logic Analysis")
+# THE COMPLIANCE TABLE (Visible Audit Logic)
+st.subheader(" Compliance: ESRS Mapping")
+map_col1, map_col2 = st.columns([2, 1])
 
-# --- THIS IS THE SECTION YOU ARE LOOKING FOR ---
-st.header("📑 Compliance & Audit Readiness")
-top_left, top_right = st.columns([1, 1])
-
-with top_left:
-    st.write("**ESRS Mapping Table**")
+with map_col1:
     mapping = {
-        "Source": ["Acc: 4010", "Acc: 7010", "Sales Data"],
-        "ESRS Category": ["E5: Resource", "S1: Workforce", "E5: Plate Waste"],
-        "Status": ["✅ Verified", "✅ Verified", "✅ Verified"]
+        "Data Source": ["Acc 4010 (Invoices)", "Sales/POS Data", "Fortnox Time"],
+        "Waste Category": ["Input (Ingredients)", "Output (Ready-made)", "Social (S1)"],
+        "ESRS Code": ["E5: Resource Use", "E5: Waste Management", "S1: Workforce"]
     }
     st.table(pd.DataFrame(mapping))
 
-with top_right:
-    st.write("**Mandatory Export**")
-    csv_data = df.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="📥 DOWNLOAD OFFICIAL CSRD REPORT (CSV)",
-        data=csv_data,
-        file_name="Karna_Compliance_Report.csv",
-        mime='text/csv',
-        use_container_width=True
-    )
-    st.info("Visible, high-priority export for Monday's meeting.")
+with map_col2:
+    st.write("**Audit Ready**")
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button(" EXPORT AUDIT REPORT", csv, "Karna_Audit.csv", "text/csv", use_container_width=True)
 
 st.divider()
 
-# 5. METRICS
-m1, m2, m3 = st.columns(3)
-m1.metric("Total Waste (E5)", f"{df['ingredient_waste_kg'].sum() + df['sales_plate_waste_kg'].sum():,.1f} kg")
-m2.metric("Burnout Alerts", f"{(df['max_individual_overtime'] > 12).sum()}")
-m3.metric("Leakage (SEK)", f"{(df['supplier_invoice_sek'].sum() * 0.12):,.0f}")
+# --- ANALYTICS ---
+view = st.radio("Switch View", ["Sustainability (E5)", "Workforce (S1)"], horizontal=True)
 
-# 6. GRAPHS
-if view_mode == "CSRD Rapportering":
-    st.subheader("Waste Analysis: Ingredients (Input) vs. Plate Waste (Output)")
-    st.area_chart(df.set_index('date')[['ingredient_waste_kg', 'sales_plate_waste_kg']])
+if view == "Sustainability (E5)":
+    st.subheader("Waste Analysis: Ingredients vs. Ready-made")
+    # This chart explicitly shows Input vs Output
+    st.area_chart(df.set_index('date')[['ingredient_waste', 'plate_waste']])
+    st.caption("Lower area: Ingredient Spoilage (Input) | Upper area: Unsold Ready-made/Plate Waste (Output)")
 else:
-    st.subheader("Labor Intensity: Actual vs. Contract")
-    st.line_chart(df.set_index('date')[['actual_hours_clocked', 'contract_hours']])
+    st.subheader("Labor Intensity: Contract vs. Actual")
+    st.line_chart(df.set_index('date')[['actual_hrs', 'contract_hrs']])
+    st.caption("Monitoring the delta to identify S1 Burnout risks.")
+
+st.success(f"Potential recovery identified: **{(df['supplier_spend'].sum()*0.12):,.0f} SEK**")

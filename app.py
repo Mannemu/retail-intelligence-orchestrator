@@ -8,77 +8,89 @@ Created on Tue Mar 17 11:31:50 2026
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sqlalchemy import create_engine
-import pickle
-import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
 
-# 1. Page Configuration
-st.set_page_config(page_title="Retail Intelligence Dashboard", layout="wide")
+ # PAGE SETUP
+st.set_page_config(page_title="Service Logic: CSRD/ESRS Dashboard", layout="wide")
 
-st.title(" Retail Demand & Inventory Forecaster")
-st.markdown("""
-This dashboard predicts future inventory needs based on historical sales, seasonality, and price points.
-*Built with Python, Scikit-Learn, and SQLite.*
-""")
-
-# 2. Data & Model Loaders
+# THE "BRAIN" (Synthetic Data Harvester)
+# This simulates the data coming from Fortnox Supplier Invoices & Payroll
 @st.cache_data
-def load_data():
-    engine = create_engine('sqlite:///retail_inventory.db')
-    with engine.connect() as conn:
-        df = pd.read_sql('sales_data', conn)
-    df['date'] = pd.to_datetime(df['date'])
+def harvest_simulated_fortnox_data():
+    dates = pd.date_range(end=datetime.today(), periods=120, freq='D')
+    data = {
+        'date': dates,
+        'supplier_invoice_sek': np.random.uniform(8000, 25000, size=120),
+        'food_category': np.random.choice(['Meat/Dairy', 'Produce', 'Dry Goods'], size=120),
+        'waste_estimate_kg': np.random.uniform(15, 60, size=120),
+        'staff_overtime_hours': np.random.uniform(0, 15, size=120),
+        'event_tag': np.random.choice(['None', 'Hockey Game', 'Corporate Event', 'Wedding'], p=[0.7, 0.1, 0.1, 0.1], size=120)
+    }
+    df = pd.DataFrame(data)
+    # Inject "spikes" for event days to show predictive capability
+    df.loc[df['event_tag'] != 'None', 'waste_estimate_kg'] *= 1.8
+    df.loc[df['event_tag'] != 'None', 'staff_overtime_hours'] *= 2.5
     return df
 
-def load_model():
-    with open('forecaster_model.pkl', 'rb') as f:
-        return pickle.load(f)
+df = harvest_simulated_fortnox_data()
 
-# Initialize data and model
-df = load_data()
-model = load_model()
+# HEADER & SECTOR SELECTION
+st.title(" Service Industry Intelligence: CSRD & ESRS Compliance")
+st.markdown("""
+**Domain:** Large-Scale Kitchens & Event Management | **Regulation:** ESRS E5 & S1
+*Bridging the gap between Fortnox Financials and Sustainability Reporting.*
+""")
 
-# 3. Sidebar Filters
-st.sidebar.header("Filter Analytics")
-category = st.sidebar.selectbox("Select Product Category", df['category'].unique())
-filtered_df = df[df['category'] == category].sort_values('date')
+# TOP LEVEL METRICS (The CFO View)
+col1, col2, col3, col4 = st.columns(4)
 
-# 4. Main Dashboard Metrics
-col1, col2, col3 = st.columns(3)
 with col1:
-    st.metric("Total Units Sold", f"{int(filtered_df['units_sold'].sum()):,}")
+    total_waste = df['waste_kg' if 'waste_kg' in df else 'waste_estimate_kg'].sum()
+    st.metric("Total Food Waste (E5)", f"{total_waste:,.0f} kg", delta="-4.2% (Benchmark)")
+
 with col2:
-    avg_price = f"${filtered_df['unit_price'].mean():.2f}"
-    st.metric("Avg Unit Price", avg_price)
+    # Logic: Overtime > 10% of total hours = High Burnout Risk
+    burnout_risk = "CRITICAL" if df['staff_overtime_hours'].tail(7).mean() > 8 else "STABLE"
+    st.metric("Workforce Stability (S1)", burnout_risk, delta="Burnout Alert" if burnout_risk == "CRITICAL" else "Good")
+
 with col3:
-    current_stock = filtered_df['stock_level'].iloc[-1]
-    st.metric("Current Stock Level", f"{int(current_stock):,}")
+    # Financial Materiality: Waste cost estimate
+    waste_cost = (df['supplier_invoice_sek'].sum() * 0.18) # Assuming 18% cost of waste
+    st.metric("Financial Leakage (Waste)", f"{waste_cost:,.0f} SEK")
 
-# 5. Visualizing Historical Sales
-st.subheader(f"Historical Sales Trend: {category}")
-fig, ax = plt.subplots(figsize=(10, 4))
-ax.plot(filtered_df['date'], filtered_df['units_sold'], color='#1f77b4', linewidth=2)
-ax.set_ylabel("Units Sold")
-st.pyplot(fig)
+with col4:
+    st.metric("CSRD Readiness", "82%", delta="Ready for Audit")
 
-# 6. The "Predictive" Piece (What-If Analysis)
+# THE "EVENT SPIKE" ANALYSIS (Social + Logistical Logic)
 st.divider()
-st.subheader("🔮 Demand Forecaster (What-If Scenario)")
-st.write("Adjust the variables below to see the predicted demand for next week.")
+st.subheader(" Event Impact Analysis: Waste vs. Staff Burnout")
+st.write("This chart visualizes how high-pressure events (like Hockey Games) correlate with waste spikes and staff stress.")
 
-# User Inputs for Prediction
-price_input = st.slider("Target Unit Price ($)", 10.0, 200.0, float(filtered_df['unit_price'].iloc[-1]))
-is_weekend_input = st.checkbox("Is this for a Weekend?")
-lag_sales = filtered_df['units_sold'].iloc[-1] # Simplification for the demo
+chart_data = df.set_index('date')[['waste_estimate_kg', 'staff_overtime_hours']]
+st.area_chart(chart_data)
 
-# Prepare the data for the model
-# Feature order: ['day_of_week', 'month', 'is_weekend', 'sales_lag_7', 'unit_price']
-input_features = np.array([[1, 3, int(is_weekend_input), lag_sales, price_input]])
-prediction = model.predict(input_features)[0]
+# CONSULTING INSIGHT GENERATOR (The Data Science Piece)
+st.sidebar.header("Strategy Controls")
+st.sidebar.write("Simulate operational changes:")
+reduction_target = st.sidebar.slider("Waste Reduction Target (%)", 0, 50, 15)
 
-st.success(f"### Predicted Demand: **{int(prediction)} units**")
+predicted_savings = waste_cost * (reduction_target / 100)
 
-if prediction > current_stock:
-    st.warning(" Warning: Predicted demand exceeds current stock. Reorder recommended.")
-else:
-    st.info(" Inventory levels appear sufficient for predicted demand.")
+st.sidebar.success(f"**Projected Annual Savings:** {predicted_savings:,.0f} SEK")
+
+# MOCK FORTNOX "TRANSLATION" (The Demonstration)
+with st.expander(" View Fortnox-to-ESRS Data Mapping"):
+    st.info("This section shows how we translate raw financial codes into regulatory metrics.")
+    
+    mapping_demo = {
+        "Fortnox Account": ["4010 (Purchases)", "7010 (Salaries)", "7210 (Overtime)", "5410 (Consumables)"],
+        "ESRS Category": ["E5: Resource Inflow", "S1: Workforce Impact", "S1: Working Conditions", "E5: Waste Management"],
+        "Derived Metric": ["Food Volume (kg)", "Retention Rate", "Burnout Risk Index", "Packaging Waste (t)"]
+    }
+    st.table(pd.DataFrame(mapping_demo))
+
+#  MONDAY PREP FOOTER
+st.divider()
+if st.button("Generate Preliminary ESRS Report (Draft)"):
+    st.balloons()
+    st.download_button("Download CSV for Auditor", df.to_csv(), "ESRS_Draft_Report.csv")

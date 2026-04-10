@@ -10,15 +10,15 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
-# --- 1. PAGE CONFIG & THEME ---
-st.set_page_config(page_title="ServiceLogic | CSRD & Gov Compliance", layout="wide")
+# 1. PAGE CONFIG & THEME 
+st.set_page_config(page_title="Kärna Service Logic | CSRD Compliance", layout="wide")
 
-# --- 2. THE BRAIN: GRANULAR INDUSTRY DATA ---
-@st.cache_data
+# 2. THE BRAIN: 24-HOUR SYNC LOGIC (Option 2)
+# The 'ttl' ensures the data is only "fetched" once every 24 hours
+@st.cache_data(ttl=86400)
 def generate_granular_data(sector):
     dates = pd.date_range(end=datetime.today(), periods=90, freq='D')
     
-    # Sector multipliers for ingredients and labor
     multipliers = {
         "Event Center": {"waste": 45, "overtime": 12, "vol": 20000},
         "Hotel (F&B)": {"waste": 30, "overtime": 8, "vol": 15000},
@@ -29,22 +29,22 @@ def generate_granular_data(sector):
     
     m = multipliers.get(sector, multipliers["Restaurant"])
     
-    # Simulating individual staff data (Anonymous IDs for Duty of Care)
-    staff_ids = [f"Staff_{i}" for i in range(1, 11)]
-    
     data = {
         'date': dates,
         'supplier_invoice_sek': np.random.uniform(m['vol']*0.8, m['vol']*1.2, size=90),
-        'waste_kg': np.random.uniform(m['waste']*0.5, m['waste']*1.5, size=90),
-        'ingredient_yield_gap': np.random.uniform(0.05, 0.25, size=90), # % of specific high-value items lost
-        'avg_overtime_hours': np.random.uniform(0, m['overtime'], size=90),
+        # CATEGORIZED WASTE: Input (Ingredients) vs Output (Plate Waste/Ready-made)
+        'ingredient_waste_kg': np.random.uniform(m['waste']*0.4, m['waste']*0.8, size=90),
+        'plate_waste_kg': np.random.uniform(m['waste']*0.1, m['waste']*0.3, size=90),
+        'contract_hours': [160] * 90,
+        'actual_hours': np.random.uniform(160, 160 + m['overtime']*4, size=90),
         'max_individual_overtime': np.random.uniform(m['overtime']*0.8, m['overtime']*2, size=90)
     }
     return pd.DataFrame(data)
 
-# --- 3. SIDEBAR CONTROLS ---
+# 3. SIDEBAR START 
 st.sidebar.image("https://img.icons8.com/fluency/96/brain.png", width=50)
 st.sidebar.title("Kärna Service Logic")
+st.sidebar.info("🔄 Sync Mode: 24-Hour Cycle Active")
 
 sector = st.sidebar.selectbox(
     "Välj verksamhetstyp", 
@@ -55,67 +55,59 @@ view_mode = st.sidebar.radio("Analysnivå", ["Organisatorisk (CSRD)", "Operativ 
 
 st.sidebar.divider()
 
-# JURIDISKA VILLKOR & AVTAL
 with st.sidebar.expander("⚖️ Juridiska villkor & Avtal"):
     st.markdown("### ANVÄNDARAVTAL")
-    st.caption("Senast uppdaterad: April 2026")
-    
-    st.markdown("""
-    Detta Avtal reglerar förhållandet mellan Slutanvändaren och Kärna Service Logic ("App-utvecklaren").
-    """)
+    st.markdown("#### KOMPLETTERANDE AVTAL")
+    st.info("Pris: 199 SEK/mån. Benchmarking baseras på anonymiserad branschdata.")
 
-    st.markdown("#### 1. KOMPLETTERANDE VILLKOR")
-    st.info("""
-    **Beslutsstöd:** Appen är ett verktyg för analys. Kärna ansvarar inte för affärsbeslut. Slutanvändaren ansvarar för att kontrollera siffror mot originaldata i Fortnox.
-
-    **Tillgänglighet:** Planerat underhåll sker söndagar 22:00 – måndagar 04:00. Support ges helgfria vardagar 09:00 – 17:00.
-
-    **Benchmarking:** Kärna har rätt att använda anonymiserad data för branschjämförelser. Inga identifierbara person- eller företagsuppgifter delas.
-
-    **Pris:** 199 SEK/mån (exkl. moms). Debiteras via Fortnox.
-    """)
-
-    st.markdown("#### 2. STANDARDVILLKOR (FORTNOX)")
-    st.markdown("""
-    **Nyttjanderätt:** Slutanvändaren erhåller en icke-exklusiv rätt att använda Appen.
-    **Ansvar:** App-utvecklaren ansvarar ej för indirekta förluster.
-    """)
-
-# --- 4. DATA PROCESSING ---
+# 4. DATA PROCESSING 
 df = generate_granular_data(sector)
-financial_leakage = df['supplier_invoice_sek'].sum() * df['ingredient_yield_gap'].mean()
-burnout_risk_count = (df['max_individual_overtime'] > 12).sum() # Example threshold
+total_waste = df['ingredient_waste_kg'].sum() + df['plate_waste_kg'].sum()
+financial_leakage = df['supplier_invoice_sek'].sum() * 0.12 # Simulated yield gap leakage
+burnout_risk_count = (df['max_individual_overtime'] > 12).sum()
 
-# --- 5. MAIN DASHBOARD ---
+# 5. MAIN DASHBOARD 
 st.title(f"{sector} | {view_mode}")
-st.markdown(f"**Status:** Aktuella mätvärden för ESRS E5 & S1 rapportering")
 
 # Metrics Row
 c1, c2, c3 = st.columns(3)
 with c1:
-    st.metric("Total Waste (E5)", f"{df['waste_kg'].sum():,.1f} kg", "-2% mot branschsnitt")
+    st.metric("Total Waste (E5)", f"{total_waste:,.1f} kg", "-2.4% Benchmark")
 with c2:
-    risk_status = "HÖG" if burnout_risk_count > 10 else "NORMAL"
-    st.metric("Burnout Risk (S1)", f"{risk_status}", f"{burnout_risk_count} kritiska incidenter")
+    risk_status = "CRITICAL" if burnout_risk_count > 10 else "STABLE"
+    st.metric("Burnout Risk (S1)", risk_status, f"{burnout_risk_count} incidents")
 with c3:
-    st.metric("Ekonomiskt läckage", f"{financial_leakage:,.0f} SEK", "Baserat på ingrediensanalys")
+    st.metric("Financial Leakage", f"{financial_leakage:,.0f} SEK")
 
-# Visuals based on View Mode
+st.divider()
+
+# 6. VISUALS 
 if view_mode == "Operativ (Duty of Care)":
-    st.subheader("Individuell belastningsanalys (Anonymiserad)")
-    st.line_chart(df.set_index('date')['max_individual_overtime'])
-    st.info("Systemet flaggar för 'Duty of Care'-intervention när enskild personal överskrider 12 timmar övertid per vecka.")
+    st.subheader("Labor Intensity: Actual vs. Contract Hours")
+    st.line_chart(df.set_index('date')[['actual_hours', 'contract_hours']])
+    st.caption("Monitoring the delta between planned hours and actual clock-ins (ESRS S1).")
 else:
-    st.subheader("Ingrediens- och resursflöde")
-    st.area_chart(df.set_index('date')[['waste_kg', 'supplier_invoice_sek']])
+    st.subheader("E5: Resource Usage (Ingredients vs. Plate Waste)")
+    # Stacked chart showing the difference between Input and Output waste
+    st.area_chart(df.set_index('date')[['ingredient_waste_kg', 'plate_waste_kg']])
+    st.caption("Layer 1 (Bottom): Ingredient Yield Loss | Layer 2 (Top): Unsold Prepared Foods")
 
-# EXCEL REPORT
-csv_data = df.to_csv(index=False)
-st.download_button(
-    label=f"Exportera CSRD-rapport för {sector}",
-    data=csv_data,
-    file_name=f"Karna_{sector}_Report.csv",
-    mime="text/csv"
-)
+st.divider()
 
-st.success(f"Genom att åtgärda identifierade yield-gaps på ingrediensnivå kan verksamheten spara ca **{financial_leakage*0.5:,.0f} SEK** nästa kvartal.")
+# 7. DOWNLOADABLE REPORTS (The section you wanted visible)
+st.subheader("Compliance Export")
+col_a, col_b = st.columns(2)
+
+with col_a:
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label=f"📥 Download {sector} Raw Data (CSV)",
+        data=csv,
+        file_name=f"Karna_{sector.replace(' ', '_')}_Compliance.csv",
+        mime='text/csv',
+    )
+
+with col_b:
+    st.info("This report is formatted for automated ESRS reporting and auditor verification.")
+
+st.success(f"Strategy: Addressing ingredient yield gaps could recover **{financial_leakage*0.5:,.0f} SEK** this quarter.")

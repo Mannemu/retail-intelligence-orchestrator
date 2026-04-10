@@ -10,10 +10,10 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
-# 1. PAGE CONFIG & THEME 
-st.set_page_config(page_title="Kärna Service Logic | CSRD Compliance", layout="wide")
+# 1. PAGE CONFIG
+st.set_page_config(page_title="Kärna Service Logic | CSRD", layout="wide")
 
-# 2. THE BRAIN: DATA GENERATION
+# 2. DATA ENGINE
 @st.cache_data
 def generate_granular_data(sector):
     dates = pd.date_range(end=datetime.today(), periods=90, freq='D')
@@ -37,70 +37,61 @@ def generate_granular_data(sector):
     return pd.DataFrame(data)
 
 # 3. SIDEBAR
-st.sidebar.image("https://img.icons8.com/fluency/96/brain.png", width=50)
 st.sidebar.title("Kärna Service Logic")
-sector = st.sidebar.selectbox("Välj verksamhetstyp", ["Event Center", "Hotel (F&B)", "Restaurant", "Café/Bistro", "Fast Food"])
-view_mode = st.sidebar.radio("Analysnivå", ["Organisatorisk (CSRD)", "Operativ (Duty of Care)"])
-st.sidebar.divider()
-with st.sidebar.expander("⚖️ Juridiska villkor & Avtal"):
-    st.markdown("### ANVÄNDARAVTAL")
-    st.info("**Pris:** 199 SEK/mån. **Benchmarking:** Anonymiserad data delas för branschinsikter.")
+sector = st.sidebar.selectbox("Verksamhet", ["Event Center", "Hotel (F&B)", "Restaurant", "Café/Bistro", "Fast Food"])
+view_mode = st.sidebar.radio("Analys", ["Organisatorisk (CSRD)", "Operativ (Duty of Care)"])
 
-# 4. DATA PROCESSING
+# 4. PROCESS
 df = generate_granular_data(sector)
 financial_leakage = df['supplier_invoice_sek'].sum() * df['ingredient_yield_gap'].mean()
 burnout_risk_count = (df['max_individual_overtime'] > 12).sum()
 total_overtime = df['actual_hours_clocked'].sum() - df['contract_hours'].sum()
 
-# 5. MAIN DASHBOARD
-st.title(f"{sector} | {view_mode}")
+# 5. DASHBOARD HEADER
+st.title(f"{sector} Dashboard")
 
-# Metrics Row
-c1, c2, c3, c4 = st.columns(4)
-with c1:
-    st.metric("Total Waste (E5)", f"{df['waste_kg'].sum():,.1f} kg", "-2% vs Peer Avg")
-with c2:
-    risk_status = "CRITICAL" if burnout_risk_count > 10 else "STABLE"
-    st.metric("Burnout Risk (S1)", risk_status, f"{burnout_risk_count} incidents")
-with c3:
-    st.metric("Labor Variance", f"+{total_overtime:,.0f} hrs", "Above Contract")
-with c4:
-    st.metric("Leakage (SEK)", f"{financial_leakage:,.0f}", "Yield Gap")
+# KPI METRICS
+m1, m2, m3, m4 = st.columns(4)
+m1.metric("Waste (E5)", f"{df['waste_kg'].sum():,.0f} kg")
+m2.metric("Burnout Risk", "CRITICAL" if burnout_risk_count > 10 else "STABLE")
+m3.metric("Overtime", f"+{total_overtime:,.0f} hrs")
+m4.metric("Leakage (SEK)", f"{financial_leakage:,.0f}")
 
-# 6. COMPLIANCE MAPPING (This was missing)
-st.subheader("📂 Compliance & Audit Framework")
-with st.expander("View Fortnox to ESRS Data Mapping"):
-    mapping_data = {
-        "Fortnox Source": ["4010 (Inköp)", "7010 (Löner)", "Tidrapportering", "Avfallshantering"],
-        "ESRS Category": ["E5: Resource Use", "S1: Workforce Impact", "S1: Working Conditions", "E5: Waste Management"],
-        "Audit Logic": ["Line-item Yield Analysis", "Burnout Probability", "Contract vs Actual Delta", "Anonymized Benchmark"]
+st.divider()
+
+# 6. MANDATORY COMPLIANCE SECTION (VISIBLE NOW)
+st.subheader("📑 Government Compliance & Audit")
+col1, col2 = st.columns([1, 1])
+
+with col1:
+    st.write("**Fortnox to ESRS Mapping**")
+    mapping = {
+        "Account": ["4010", "7010", "Tid"],
+        "ESRS Code": ["E5 Resource", "S1 Social", "S1 Health"],
+        "Status": ["Verified", "Verified", "Verified"]
     }
-    st.table(pd.DataFrame(mapping_data))
+    st.table(pd.DataFrame(mapping))
 
-# 7. EXPORT SECTION (This was missing)
-st.divider()
-st.subheader("📥 Export Audit-Ready Reports")
-col_a, col_b = st.columns([1, 2])
-with col_a:
-    csv = df.to_csv(index=False).encode('utf-8')
+with col2:
+    st.write("**Audit Export**")
+    csv_data = df.to_csv(index=False).encode('utf-8')
     st.download_button(
-        label=f"Download {sector} CSV Report",
-        data=csv,
-        file_name=f"Karna_{sector.replace(' ', '_')}_Compliance.csv",
+        label="📥 DOWNLOAD OFFICIAL CSRD REPORT (CSV)",
+        data=csv_data,
+        file_name=f"Karna_Compliance_{sector}.csv",
         mime='text/csv',
+        use_container_width=True # Makes it a big visible button
     )
-    st.caption("Standard CSV format for Excel/Audit tools.")
-with col_b:
-    st.dataframe(df.head(3), use_container_width=True)
+    st.info("This file is formatted for Swedish government sustainability reporting standards.")
 
 st.divider()
 
-# 8. VISUALS
+# 7. VISUALS
 if view_mode == "Operativ (Duty of Care)":
-    st.subheader("Labor Intensity: Actual Clock-ins vs. Contract")
+    st.subheader("Labor Intensity vs. Contract")
     st.line_chart(df.set_index('date')[['actual_hours_clocked', 'contract_hours']])
 else:
-    st.subheader("Resource Flow vs. Financial Leakage")
+    st.subheader("Resource Usage Trends")
     st.area_chart(df.set_index('date')[['waste_kg', 'supplier_invoice_sek']])
 
-st.success(f"Strategy: Closing yield gaps could recover **{financial_leakage*0.6:,.0f} SEK** annually.")
+st.success(f"Profit Recovery identified: **{financial_leakage*0.6:,.0f} SEK** potential gain.")

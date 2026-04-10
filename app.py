@@ -51,6 +51,39 @@ establishment_age = st.sidebar.radio("Compliance Category", ["New (Permit Tracki
 st.sidebar.divider()
 reduction_target = st.sidebar.slider("Waste Reduction Goal (%)", 0, 50, 15)
 
+#  Add the Legal Expander 
+with st.sidebar.expander("⚖️ Juridiska villkor & Avtal"):
+    st.markdown("### ANVÄNDARAVTAL")
+    st.caption("Senast uppdaterad: April 2026")
+    
+    st.markdown("""
+    Detta avtal reglerar förhållandet mellan Slutanvändaren och App-utvecklaren (Kärna Service Logic). 
+    Genom att aktivera tjänsten via Fortnox App-market godkänner du nedanstående villkor.
+    """)
+
+    st.markdown( KOMPLETTERANDE AVTAL)
+    st.info("""
+    1. TJÄNSTENS SYFTE
+    Appen är ett verktyg för analys och beslutsstöd. Kärna ansvarar inte för affärsbeslut eller myndighetstvister. Slutanvändaren äger ansvaret för att kontrollera siffror mot originalfakturor i Fortnox innan åtgärd tas.
+
+    2. TILLGÄNGLIGHET & SUPPORT
+    Vi strävar efter hög driftssäkerhet, men planerat underhåll sker söndagar 22:00 – måndagar 04:00. Support ges via e-post helgfria vardagar 09:00 – 17:00.
+
+    3. DATA & BENCHMARKING
+    Kärna har rätt att använda anonymiserad data för att skapa branschjämförelser. Inga företagsnamn eller personuppgifter delas någonsin med tredje part eller andra användare.
+
+    4. PRIS & BETALNING
+    Månadsavgift: 199 SEK (exkl. moms). Debiteras via Fortnox. Uppsägning följer Fortnox standardvillkor.
+    """)
+
+    st.markdown("#STANDARDVILLKOR (FORTNOX)")
+    st.markdown("""
+    Nyttjanderätt: Slutanvändaren erhåller en icke-exklusiv rätt att använda Appen.
+    Immateriella rättigheter: App-utvecklaren äger samtliga rättigheter till Appen.
+    Ansvar: App-utvecklaren ansvarar ej för indirekta förluster.
+    Uppsägning: Sker senast en (1) månad före nästa fakturering.
+    """)
+
 # DATA LOADING & CALCULATIONS 
 df = generate_industry_data(sector)
 waste_cost_ratio = 0.18 # Industry standard: 18% of food cost is lost to waste
